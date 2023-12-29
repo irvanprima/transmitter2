@@ -27,7 +27,7 @@ type ClientMessage struct {
 }
 
 type Server struct {
-	conns    map[*websocket.Conn]string // Map untuk menyimpan koneksi berdasarkan ID
+	conns    map[string]*websocket.Conn // Map untuk menyimpan koneksi berdasarkan ID
 	connsMu  sync.Mutex
 	nextID   int
 	upgrader websocket.Upgrader
@@ -35,7 +35,7 @@ type Server struct {
 
 func NewServer() *Server {
 	return &Server{
-		conns:    make(map[*websocket.Conn]string),
+		conns:    make(map[string]*websocket.Conn), // Ubah inisialisasi map ini
 		nextID:   1,
 		upgrader: websocket.Upgrader{CheckOrigin: func(r *http.Request) bool { return true }},
 	}
@@ -53,7 +53,7 @@ func (s *Server) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 	s.connsMu.Lock()
 	connID := fmt.Sprintf("%d", s.nextID)
 	s.nextID++
-	s.conns[conn] = connID
+	s.conns[connID] = conn
 	s.connsMu.Unlock()
 
 	// Kirim ID ke klien
@@ -65,7 +65,7 @@ func (s *Server) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 			log.Println(err)
 			// Hapus koneksi dari map saat koneksi tertutup atau ada error
 			s.connsMu.Lock()
-			delete(s.conns, conn)
+			delete(s.conns, connID)
 			s.connsMu.Unlock()
 			return
 		}
@@ -78,14 +78,24 @@ func (s *Server) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 
 		// Kirim pesan hanya ke koneksi tujuan
 		s.connsMu.Lock()
-		for destConn, destID := range s.conns {
-			if destID == clientMsg.DestinationID {
-				destConn.WriteMessage(websocket.TextMessage, []byte(clientMsg.Content))
-				// Kirim respons ke klien bahwa pesan berhasil dikirim
-				conn.WriteMessage(websocket.TextMessage, []byte("Pesan berhasil dikirim"))
-			}
-		}
-		s.connsMu.Unlock()
+		found := false
+		for destID, destConn := range s.conns {
+			//if destID.ID == clientMsg.DestinationID {
+				if destID == clientMsg.DestinationID {
+					destConn.WriteMessage(websocket.TextMessage, []byte(clientMsg.Content))
+					// Kirim respons ke klien bahwa pesan berhasil dikirim
+					conn.WriteMessage(websocket.TextMessage, []byte("Pesan berhasil dikirim"))
+					
+					found = true
+					//break
+					} 
+				}
+				
+				
+				s.connsMu.Unlock()
+				if !found {
+					conn.WriteMessage(websocket.TextMessage, []byte("orangnya tidak ada"))
+				}
 	}
 }
 
@@ -95,8 +105,9 @@ func (s *Server) getConnectionInfo() []InfoConnection {
 
 	var connections []InfoConnection
 
-	for conn, connID := range s.conns {
+	for connID, conn := range s.conns {
 		info := InfoConnection{
+			//ID:   connID.ID,
 			ID:   connID,
 			Addr: conn.RemoteAddr().String(),
 		}
@@ -177,5 +188,6 @@ func main() {
 		connectionsHandler(w, r, server)
 	})
 
-	log.Fatal(http.ListenAndServe(":8080", nil))
+	fmt.Println("Server is listening on port 8181")
+	log.Fatal(http.ListenAndServe(":8181", nil))
 }
