@@ -89,10 +89,9 @@ func (s *Server) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 					found = true
 					//break
 					} 
-				}
-				
-				
+				}							
 				s.connsMu.Unlock()
+				
 				if !found {
 					conn.WriteMessage(websocket.TextMessage, []byte("orangnya tidak ada"))
 				}
@@ -106,8 +105,7 @@ func (s *Server) getConnectionInfo() []InfoConnection {
 	var connections []InfoConnection
 
 	for connID, conn := range s.conns {
-		info := InfoConnection{
-			//ID:   connID.ID,
+		info := InfoConnection{			
 			ID:   connID,
 			Addr: conn.RemoteAddr().String(),
 		}
